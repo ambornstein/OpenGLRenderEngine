@@ -8,12 +8,17 @@
 #include <vector>
 #include <sstream>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+const int width = 1024;
+const int height = 768;
+
 //void processInput(GLFWwindow* window);
 GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path);
 
 int main(void)
 {
-	std::cout << "Brick";
 	if (!glfwInit()) {
 		std::cout << "Failed to initialize GLFW.\n";
 		return -1;
@@ -22,7 +27,7 @@ int main(void)
 	GLFWwindow* window;
 
 	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(1024, 768, "GLFW CMake starter", NULL, NULL);
+	window = glfwCreateWindow(width, height, "GLFW CMake starter", NULL, NULL);
 
 	if (!window)
 	{
@@ -37,6 +42,21 @@ int main(void)
 		std::cout << "Failed to initialize GLAD.\n";
 		return -1;
 	}
+
+	// Projection matrix: 45° Field of View, 4:3 ratio, display range: 0.1 unit <-> 100 units
+	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+
+	// Camera matrix
+	glm::mat4 View = glm::lookAt(
+		glm::vec3(4, 3, 3),
+		glm::vec3(0, 0, 0),
+		glm::vec3(0, 1, 0)
+	);
+
+	glm::mat4 Model = glm::mat4(1.0f);
+
+	glm::mat4 mvp = Projection * View * Model;
+	
 
 	static const float g_vertex_buffer_data[] = {
 		-1.0f, -1.0f, 0.0f, 1.0, 0.0, 0.0,
@@ -54,33 +74,45 @@ int main(void)
 	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(
-		0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-		3,                  // size
-		GL_FLOAT,           // type
-		GL_FALSE,           // normalized?
-		6 * sizeof(float), // stride
-		(void*)0            // array buffer offset
-	);
-
-	glEnableVertexAttribArray(0);
-
-	glVertexAttribPointer(
-		1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float))
-	);
-
-	glEnableVertexAttribArray(1);
-
 	GLuint programID = LoadShaders("BasicVertex.vshad", "BasicFrag.fshad");
+
+	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 
 	do {
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 		glUseProgram(programID);
+
+		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp[0][0]);
+
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+
+		glVertexAttribPointer(
+			0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+			3,                  // size
+			GL_FLOAT,           // type
+			GL_FALSE,           // normalized?
+			6 * sizeof(float), // stride
+			(void*)0            // array buffer offset
+		);
+
+		glVertexAttribPointer(
+			1,
+			3,
+			GL_FLOAT,
+			GL_FALSE,
+			6 * sizeof(float),
+			(void*)(3 * sizeof(float))
+		);
 
 		glBindVertexArray(VertexArrayID);
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glDisableVertexAttribArray(0);
+		glDisableVertexAttribArray(1);
 
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
@@ -149,7 +181,7 @@ GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 	}
 
 	// Compile Fragment Shader
-	printf("Compiling shader : %s\n", vertex_file_path);
+	printf("Compiling shader : %s\n", fragment_file_path);
 	char const* FragmentSourcePointer = FragmentShaderCode.c_str();
 
 	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer, NULL);
